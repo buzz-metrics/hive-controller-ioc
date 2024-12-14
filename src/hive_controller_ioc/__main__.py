@@ -1,5 +1,7 @@
 """Interface for ``python -m hive_controller_ioc`` using Typer."""
 
+import logging
+
 import typer
 
 from ._version import __version__
@@ -12,7 +14,8 @@ app = typer.Typer(no_args_is_help=True)
 def run(
     host: str = typer.Argument(..., help="The IP of the target hive controller"),
     prefix: str = typer.Argument(..., help="The EPICS prefix for the hive controller"),
-    bobfile_dir: str = typer.Argument(..., help="The directory of the bobfile"),
+    bob_dir: str = typer.Option(..., help="The directory of the bobfile"),
+    logging_level: str = typer.Option("error", help="The logging level"),
 ):
     """
     Start the IOC.
@@ -22,7 +25,29 @@ def run(
         prefix: The EPICS prefix for the hive controller.
     """
     typer.echo("IOC starting...")
-    start_ioc(host, prefix, bobfile_dir)
+    setup_logging(logging_level)
+    start_ioc(host, prefix, bob_dir)
+
+
+def setup_logging(logging_level: str):
+    """
+    Sets up the logging level based on the CLI param
+    """
+    level_map = {
+        "debug": logging.DEBUG,
+        "info": logging.INFO,
+        "warning": logging.WARNING,
+        "error": logging.ERROR,
+        "critical": logging.CRITICAL,
+    }
+
+    level = level_map.get(logging_level.lower(), logging.ERROR)
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+    )
+
+    logging.debug("Logging is set up.")
 
 
 def version_callback(value: bool):
