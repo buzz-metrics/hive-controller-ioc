@@ -1,25 +1,52 @@
+from pathlib import Path
+
 import cothread
+from pvi._format.dls import DLSFormatter
+from pvi._format.template import format_template
+from pvi.device import Device, SignalR, SignalRW
 from softioc import builder, softioc
 
+from ._pv_poller import PV_Poller
 
-def start_ioc(host: str, prefix: str):
+
+def start_ioc(host: str, prefix: str, bobfile_dir: str):
     builder.SetDeviceName(prefix)
 
-    # Create some records
-    ai = builder.aIn("AI", initial_value=5)
-    ao = builder.aOut("AO", initial_value=12.45, on_update=lambda v: ai.set(v))  # noqa: F841
+    pv_temp = builder.aIn("HCU:TEMPERATURE", initial_value=-99)
+    pv_humidity = builder.aIn("HCU:HUMIDITY", initial_value=-99)
+    pv_poll_rate = builder.aOut(
+        "HCU:POLL_RATE",
+        initial_value=10,
+        on_update=lambda value: pv_poll_rate_rbv.set(value),
+    )
+    pv_poll_rate_rbv = builder.aIn(
+        "HCU:POLL_RATE_RBV", initial_value=pv_poll_rate.get()
+    )
+    # ao = builder.aOut("AO", on_update=lambda v: ai.set(v))  # noqa: F841
 
-    # Boilerplate get the IOC started
+    make_screen(prefix, bobfile_dir)
+
     builder.LoadDatabase()
     softioc.iocInit()
 
-    # Start processes required to be run after iocInit
-    def update():
-        while True:
-            ai.set(ai.get() + 1)
-            cothread.Sleep(1)
+    myPoller = PV_Poller(host, pv_poll_rate, [pv_humidity, pv_temp])
+    cothread.Spawn(myPoller.poll)
 
-    cothread.Spawn(update)
-
-    # Finally leave the IOC running with an interactive shell.
     softioc.interactive_ioc(globals())
+
+
+def make_screen(prefix: str, filename: str):
+    signals = [
+        SignalR(name="Temperature", read_pv=prefix + ":HCU:TEMPERATURE"),
+        SignalR(name="Humidity", read_pv=prefix + ":HCU:HUMIDITY"),
+        SignalRW(
+            name="UpdateFrequency",
+            read_pv=prefix + ":HCU:POLL_RATE_RBV",
+            write_pv=prefix + ":HCU:POLL_RATE",
+        ),
+        # SignalX(name="Command", write_pv="Go", value="1"),
+    ]
+    device = Device(label="Hive Control Unit", children=signals)
+
+    format_template(device, prefix, Path(filename))
+    DLSFormatter().format(device, Path(filename))

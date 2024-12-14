@@ -12,6 +12,7 @@ app = typer.Typer(no_args_is_help=True)
 def run(
     host: str = typer.Argument(..., help="The IP of the target hive controller"),
     prefix: str = typer.Argument(..., help="The EPICS prefix for the hive controller"),
+    bobfile_dir: str = typer.Argument(..., help="The directory of the bobfile"),
 ):
     """
     Start the IOC.
@@ -20,12 +21,8 @@ def run(
         host: The IP of the target hive controller.
         prefix: The EPICS prefix for the hive controller.
     """
-    if not (host and prefix):
-        typer.echo("Please provide a host and a prefix")
-        raise typer.Exit(code=1)
-
-    typer.echo("Things are happening")
-    start_ioc(host, prefix)
+    typer.echo("IOC starting...")
+    start_ioc(host, prefix, bobfile_dir)
 
 
 def version_callback(value: bool):
