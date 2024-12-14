@@ -1,11 +1,14 @@
+from datetime import datetime
+
 import cothread
 import requests
 
 
 class PV_Poller:
-    def __init__(self, host: str, poller_pv, target_pvs: list):
+    def __init__(self, host: str, pv_poller, pv_update_time, target_pvs: list):
         self.host = host
-        self.poller_pv = poller_pv
+        self.poller_pv = pv_poller
+        self.pv_update_time = pv_update_time
         self.target_pvs = target_pvs
 
         self.target_pv_names = [pv.name.split(":")[-1].lower() for pv in target_pvs]
@@ -14,7 +17,7 @@ class PV_Poller:
     def poll(self):
         while True:
             poll_delay = self.poller_pv.get()
-            if poll_delay == 0:
+            if poll_delay <= 0:
                 cothread.Sleep(10)
                 continue
             cothread.Sleep(poll_delay)
@@ -33,3 +36,5 @@ class PV_Poller:
         for i, pv in enumerate(self.target_pvs):
             val = values[self.target_pv_names[i]]
             pv.set(val)
+
+        self.pv_update_time.set(datetime.now().strftime("%H:%M:%S. %d/%m/%Y"))
